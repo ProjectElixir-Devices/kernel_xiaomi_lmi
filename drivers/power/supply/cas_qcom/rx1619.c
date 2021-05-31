@@ -61,7 +61,6 @@
 #define ADAPTER_XIAOMI_PD_40W     0x0c
 #define ADAPTER_VOICE_BOX     0x0d
 #define ADAPTER_XIAOMI_PD_45W 0x0e
-#define ADAPTER_XIAOMI_PD_60W 0x0f
 
 //0x000b[0:3]  0000:no charger, 0001:SDP, 0010:CDP, 0011:DCP, 0101:QC2-other,
 //0110:QC3-other, 0111:PD, 1000:fail charger, 1001:QC3-27W, 1010:PD-27W
@@ -1874,7 +1873,6 @@ void set_usb_type_current(struct rx1619_chg *chip, u8 data)
 	case ADAPTER_XIAOMI_PD_40W:		//40w
 	case ADAPTER_VOICE_BOX:
 	case ADAPTER_XIAOMI_PD_45W:
-	case ADAPTER_XIAOMI_PD_60W:
 /*
 		chip->batt_psy = power_supply_get_by_name("battery");
 		if (!chip->batt_psy) {
@@ -1999,7 +1997,6 @@ void get_usb_type_current(struct rx1619_chg *chip, u8 data)
 	case ADAPTER_XIAOMI_PD_40W:	//40w
 	case ADAPTER_VOICE_BOX:
 	case ADAPTER_XIAOMI_PD_45W:
-	case ADAPTER_XIAOMI_PD_60W:
 		chip->target_vol = ADAPTER_EPP_MI_VOL;
 		/* for usb-in design, set max usb icl to 1.8A */
 		chip->target_curr = 1500000;	//1.8A
@@ -2345,7 +2342,6 @@ static void rx1619_fw_download_work(struct work_struct *work)
 				 "[rx1619] %s: FW Version correct so skip upgrade\n",
 				 __func__);
 		} else {
-#ifndef CONFIG_FACTORY_BUILD
 			dev_info(chip->dev, "[rx1619] %s: FW download start\n",
 				 __func__);
 			if (!rx1619_onekey_download_firmware(chip))
@@ -2371,11 +2367,6 @@ static void rx1619_fw_download_work(struct work_struct *work)
 					 rx_fw_version);
 				chip->fw_version = g_fw_rx_id;
 			}
-#else
-			dev_info(chip->dev,
-				 "[rx1619] %s: factory build, don't update\n",
-				 __func__);
-#endif
 		}
 		rx_set_reverse_gpio(chip, false);
 		chip->fw_update = false;
@@ -3227,7 +3218,6 @@ static void rx1619_wireless_int_work(struct work_struct *work)
 		case ADAPTER_XIAOMI_PD_40W:
 		case ADAPTER_VOICE_BOX:
 		case ADAPTER_XIAOMI_PD_45W:
-		case ADAPTER_XIAOMI_PD_60W:
 			chip->target_vol = ADAPTER_EPP_MI_VOL;
 			break;
 		default:

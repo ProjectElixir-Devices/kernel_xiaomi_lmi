@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #define pr_fmt(fmt)	"FG: %s: " fmt, __func__
@@ -206,6 +207,7 @@
 #define FIRST_LOG_CURRENT_v2_OFFSET	0
 #define DEFAULT_FFC_TERM_CURRENT	1000
 
+#define DEFAULT_FFC_TERM_CURRENT	1000
 static struct fg_irq_info fg_irqs[FG_GEN4_IRQ_MAX];
 
 /* DT parameters for FG device */
@@ -304,7 +306,6 @@ struct fg_gen4_chip {
 	struct delayed_work	ds_page0_work;
 	unsigned char		ds_page0[16];
 #endif
-
 	struct work_struct	pl_current_en_work;
 	struct completion	mem_attn;
 	struct mutex		soc_scale_lock;
@@ -347,7 +348,7 @@ struct fg_gen4_chip {
 	bool			chg_term_good;
 	bool			soc_scale_mode;
 	bool			fastcharge_mode_enabled;
-	int				hw_country;
+	int                     hw_country;
 };
 
 struct bias_config {
@@ -2072,7 +2073,6 @@ static int fg_gen4_get_batt_profile_dt_props(struct fg_gen4_chip *chip,
 int retry_batt_profile;
 #define BATT_PROFILE_RETRY_COUNT_MAX 5
 #endif
-
 static int fg_gen4_get_batt_profile(struct fg_dev *fg)
 {
 	struct fg_gen4_chip *chip = container_of(fg, struct fg_gen4_chip, fg);
@@ -2420,6 +2420,7 @@ static bool is_profile_load_required(struct fg_gen4_chip *chip)
 			fg->profile_load_status = PROFILE_SKIPPED;
 			return false;
 		}
+
 		profiles_same = memcmp(chip->batt_profile, buf,
 					PROFILE_COMP_LEN) == 0;
 		if (profiles_same) {
@@ -2763,7 +2764,6 @@ done:
 	batt_psy_initialized(fg);
 	fg_notify_charger(fg);
 	power_supply_changed(fg->fg_psy);
-
 	schedule_delayed_work(&chip->ttf->ttf_work, msecs_to_jiffies(10000));
 	fg_dbg(fg, FG_STATUS, "profile loaded successfully");
 out:
@@ -3561,15 +3561,14 @@ static int fg_gen4_validate_soc_scale_mode(struct fg_gen4_chip *chip)
 		pr_err("Failed to get msoc rc=%d\n", rc);
 		goto fail_soc_scale;
 	}
-
 	if (is_low_temp_flag)
 		vbatt_scale_mv = 3400;
 	else
 		vbatt_scale_mv = chip->dt.vbatt_scale_thr_mv;
-
+	pr_info("get vbatt_scale_mv = %d, current now = %d\n", vbatt_scale_mv, chip->current_now);
 	if (!chip->soc_scale_mode && fg->charge_status ==
 		POWER_SUPPLY_STATUS_DISCHARGING &&
-		chip->current_now > 0 &&
+		chip->current_now  > 0 &&
 		chip->vbatt_avg < vbatt_scale_mv) {
 		rc = fg_gen4_enter_soc_scale(chip);
 		if (rc < 0) {
@@ -4389,8 +4388,7 @@ static void soc_scale_work(struct work_struct *work)
 		soc_changed = min(1, delta_time);
 		fg_dbg(fg, FG_FVSS, "get delta_time = %d, soc_changed =%d, time_since_last_change_sec = %d\n", delta_time, soc_changed, time_since_last_change_sec);
 
-		chip->soc_scale_msoc = chip->prev_soc_scale_msoc -
-					soc_changed;
+		chip->soc_scale_msoc = chip->prev_soc_scale_msoc - soc_changed;
 		chip->scale_timer = chip->dt.scale_timer_ms /
 				(chip->prev_soc_scale_msoc - soc);
 		if (chip->prev_soc_scale_msoc != chip->soc_scale_msoc)
@@ -5054,11 +5052,9 @@ static int fg_gen4_set_ki_coeff_curr(struct fg_dev *fg, bool enable_ffc)
 }
 
 
+/* All power supply functions here */
 #define SHUTDOWN_DELAY_VOL	3300
 #define SHUTDOWN_DELAY_VOL_lOW_TEMP	3100
-
-/* All power supply functions here */
-
 static int fg_psy_get_property(struct power_supply *psy,
 				       enum power_supply_property psp,
 				       union power_supply_propval *pval)
@@ -5360,7 +5356,7 @@ static int fg_psy_get_property(struct power_supply *psy,
 		pval->intval = chip->dt.ffc_ki_coeff_med_hi_chg_thr_ma;
 		break;
 	default:
-		pr_err("unsupported property %d\n", psp);
+		pr_debug("unsupported property %d\n", psp);
 		rc = -EINVAL;
 		break;
 	}
@@ -7547,13 +7543,12 @@ static int fg_gen4_probe(struct platform_device *pdev)
 				PTR_ERR(fg->fg_psy));
 		goto exit;
 	}
-
 #ifdef CONFIG_BATT_VERIFY_BY_DS28E16
-	if (chip->battery_authentic_result != true)
+	if (chip->battery_authentic_result != true) {
 		schedule_delayed_work(&chip->battery_authentic_work,
 				msecs_to_jiffies(0));
+	}
 #endif
-
 	fg->nb.notifier_call = fg_notifier_cb;
 	rc = power_supply_reg_notifier(&fg->nb);
 	if (rc < 0) {
@@ -7621,12 +7616,13 @@ static int fg_gen4_probe(struct platform_device *pdev)
 		schedule_delayed_work(&fg->profile_load_work, 0);
 
 	fg_gen4_post_init(chip);
-	if (chip->dt.fg_increase_100soc_time)
+	if (chip->dt.fg_increase_100soc_time) {
 		schedule_delayed_work(&fg->soc_monitor_work,
 			msecs_to_jiffies(0));
-	else
+	} else {
 		schedule_delayed_work(&fg->soc_monitor_work,
 			msecs_to_jiffies(5*MONITOR_SOC_WAIT_MS));
+	}
 
 	/*
 	 * if vbat is above 3.5V and msoc is 0% and battery temperature is

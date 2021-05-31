@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #include <linux/debugfs.h>
@@ -655,6 +656,15 @@ static int smb5_parse_dt_misc(struct smb5 *chip, struct device_node *node)
 
 	chg->sw_jeita_enabled = of_property_read_bool(node,
 				"qcom,sw-jeita-enable");
+
+	chg->six_pin_step_charge_enable = of_property_read_bool(node,
+				"mi,six-pin-step-chg");
+
+	chg->qc3p5_supported = of_property_read_bool(node,
+			"mi,support-qc3p5-without-smb");
+
+	chg->support_ffc = of_property_read_bool(node,
+				"mi,support-ffc");
 
 	chg->six_pin_step_charge_enable = of_property_read_bool(node,
 				"mi,six-pin-step-chg");
@@ -1726,7 +1736,7 @@ static int smb5_usb_set_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CTM_CURRENT_MAX:
 		rc = vote(chg->usb_icl_votable, CTM_VOTER,
-						val->intval >= 0, val->intval);
+				val->intval >= 0, val->intval);
 		break;
 	case POWER_SUPPLY_PROP_PR_SWAP:
 		rc = smblib_set_prop_pr_swap_in_progress(chg, val);
@@ -4686,7 +4696,7 @@ static int smb5_request_interrupts(struct smb5 *chip)
 		}
 	}
 
-	/* enable batt_temp irq when plugin usb poweron charging */
+	/*enable batt_temp irq when plugin usb poweron charging*/
 	if (chg->irq_info[BAT_TEMP_IRQ].irq
 			&& (chg->early_usb_attach || chg->early_dc_attach)) {
 		enable_irq_wake(chg->irq_info[BAT_TEMP_IRQ].irq);
@@ -5137,7 +5147,7 @@ static void smb5_shutdown(struct platform_device *pdev)
 		smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
 				TYPEC_POWER_ROLE_CMD_MASK, EN_SNK_ONLY_BIT);
 
-	/* fix PD bug. Set 0x1360 = 0x0c when shutdown */
+	/*fix PD bug.Set 0x1360 = 0x0c when shutdown*/
 	smblib_write(chg, USBIN_ADAPTER_ALLOW_CFG_REG, USBIN_ADAPTER_ALLOW_5V_TO_12V);
 	/* force enable and rerun APSD */
 	smblib_apsd_enable(chg, true);

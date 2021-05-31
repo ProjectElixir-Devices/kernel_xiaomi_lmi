@@ -3487,7 +3487,6 @@ static int smblib_dc_therm_charging(struct smb_charger *chg,
 		}
 		break;
 	case ADAPTER_XIAOMI_PD_45W:
-	case ADAPTER_XIAOMI_PD_60W:
 		thermal_fcc_ua = chg->thermal_mitigation_dc_45w[temp_level];
 		thermal_icl_ua = chg->thermal_mitigation_dc_45w[temp_level];
 		break;
@@ -8368,8 +8367,7 @@ int smblib_get_quick_charge_type(struct smb_charger *chg)
 	if (chg->pd_active)
 		return QUICK_CHARGE_FAST;
 
-	if (chg->wireless_charge_type == ADAPTER_XIAOMI_PD_45W ||
-		chg->wireless_charge_type == ADAPTER_XIAOMI_PD_60W) {
+	if (chg->wireless_charge_type == ADAPTER_XIAOMI_PD_45W) {
 		return QUICK_CHARGE_SUPER;
 	} else if (chg->wireless_charge_type == ADAPTER_XIAOMI_PD_40W) {
 		return QUICK_CHARGE_TURBE;
@@ -9417,11 +9415,7 @@ static void smblib_wireless_delay_work(struct work_struct *work)
 		vote(chg->awake_votable, DC_AWAKE_VOTER, false, 0);
 	}
 }
-#ifdef CONFIG_FACTORY_BUILD
-#define MAX_DC_CURRENT_UA 2260000
-#else
 #define MAX_DC_CURRENT_UA 2500000
-#endif
 #define POWER_GOOD_OFF_DELAY_MS 1800
 #define WIRED_OVP_CLOSE_DELAY_MS 100
 #define POWER_GOOD_OFF_WIRED_DELAY_MS 1500

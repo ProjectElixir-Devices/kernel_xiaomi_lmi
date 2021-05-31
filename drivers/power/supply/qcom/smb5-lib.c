@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #include <linux/device.h>
@@ -28,7 +29,7 @@
 #define smblib_dbg(chg, reason, fmt, ...)			\
 	do {							\
 		if (*chg->debug_mask & (reason))		\
-			pr_info("%s: %s: " fmt, chg->name,	\
+			pr_err("%s: %s: " fmt, chg->name,	\
 				__func__, ##__VA_ARGS__);	\
 		else						\
 			pr_debug("%s: %s: " fmt, chg->name,	\
@@ -173,6 +174,7 @@ int smblib_icl_override(struct smb_charger *chg, enum icl_override_mode  mode)
 	int rc;
 	u8 usb51_mode, icl_override, apsd_override;
 
+	pr_info("mode: %d\n", mode);
 	switch (mode) {
 	case SW_OVERRIDE_USB51_MODE:
 		usb51_mode = 0;
@@ -566,6 +568,7 @@ static const struct apsd_result *smblib_get_apsd_result(struct smb_charger *chg)
 			rc);
 		return result;
 	}
+	smblib_err(chg, "read APSD_RESULT_STATUS stat=0x%x\n", stat);
 	stat &= APSD_RESULT_STATUS_MASK;
 
 	for (i = 0; i < ARRAY_SIZE(smblib_apsd_results); i++) {
@@ -3083,7 +3086,7 @@ int smblib_get_prop_batt_charge_done(struct smb_charger *chg,
 		if (pval.intval >= 98) {
 			/* when charge done, set bark timer to 128s to decrease wakeups */
 			smblib_set_wdog_bark_timer(chg, BARK_TIMER_LONG);
-			schedule_delayed_work(&chg->plugout_delay_awake, msecs_to_jiffies(2000));
+			vote(chg->awake_votable, CHG_AWAKE_VOTER, false, 0);
 		}
 
 		if (chg->power_good_en) {
@@ -3189,7 +3192,6 @@ int smblib_set_prop_batt_capacity(struct smb_charger *chg,
 	/* only enable write reasonable soc value */
 	if (val->intval >= 0 && val->intval <= 100) {
 		chg->fake_capacity = val->intval;
-
 		power_supply_changed(chg->batt_psy);
 	}
 
@@ -4146,6 +4148,13 @@ int smblib_dp_dm(struct smb_charger *chg, int val)
 
 	switch (val) {
 	case POWER_SUPPLY_DP_DM_DP_PULSE:
+		 /*
+		 * if hvdcp_opti wrongly send more than 30 dp pulse(11V) to smb5,
+		 * ignore them to allow maxium vbus as 11V, as charge pump do not
+		 * need the vin more than 11V, and protect the device.
+		 */
+		if (chg->pulse_cnt > MAX_PLUSE_COUNT_ALLOWED)
+			return rc;
 		/*
 		 * if hvdcp_opti wrongly send more than 30 dp pulse(11V) to smb5,
 		 * ignore them to allow maxium vbus as 11V, as charge pump do not
@@ -6474,6 +6483,7 @@ static int smblib_handle_usb_current(struct smb_charger *chg,
 #if 0
 			if ((chg->float_cfg & FLOAT_OPTIONS_MASK)
 						== FORCE_FLOAT_SDP_CFG_BIT) {
+
 				/*
 				 * Confiugure USB500 mode if Float charger is
 				 * configured for SDP mode.
@@ -6728,6 +6738,7 @@ int smblib_set_prop_typec_power_role(struct smb_charger *chg,
 		goto unlock;
 	}
 
+	pr_err("set power_role to: %d\n", power_role);
 	rc = smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
 				TYPEC_POWER_ROLE_CMD_MASK | TYPEC_TRY_MODE_MASK,
 				power_role);
@@ -6883,15 +6894,13 @@ int smblib_set_prop_pd_active(struct smb_charger *chg,
 		vote(chg->usb_icl_votable, PD_VOTER, true, USBIN_100MA);
 		vote(chg->usb_icl_votable, USB_PSY_VOTER, false, 0);
 		vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, false, 0);
-
-		/* set the fcc to PD_UNVERIFED_CURRENT when pd is not verifed */
+		/*set the fcc to PD_UNVERIFED_CURRENT when pd is not verifed*/
 		if (!chg->pd_verifed) {
 			rc = vote(chg->fcc_votable, PD_VERIFED_VOTER,
 					true, PD_UNVERIFED_CURRENT);
 			if (rc < 0)
 				smblib_err(chg, "Couldn't unvote PD_VERIFED_VOTER, rc=%d\n", rc);
 		}
-
 		/*
 		 * For PPS, Charge Pump is preferred over parallel charger if
 		 * present.
@@ -7273,6 +7282,7 @@ int smblib_set_prop_thermal_overheat(struct smb_charger *chg,
 
 	chg->thermal_overheat = !!therm_overheat;
 	return 0;
+
 }
 
 /***************************************************
@@ -8049,14 +8059,6 @@ static void smb_check_init_boot(struct work_struct *work)
 	if (chg->usb_psy)
 		power_supply_changed(chg->usb_psy);
 }
-
-static void smb_plugout_delay_awake(struct work_struct *work)
-{
-	struct smb_charger *chg = container_of(work, struct smb_charger,
-					plugout_delay_awake.work);
-	vote(chg->awake_votable, CHG_AWAKE_VOTER, false, 0);
-}
-
 static void smblib_micro_usb_plugin(struct smb_charger *chg, bool vbus_rising)
 {
 	int rc = 0;
@@ -8138,7 +8140,7 @@ void smblib_usb_plugin_hard_reset_locked(struct smb_charger *chg)
 			vote(chg->fcc_votable, FCC_STEPPER_VOTER,
 							true, 1500000);
 		/* clear chg_awake wakeup source when charger is absent */
-		schedule_delayed_work(&chg->plugout_delay_awake, msecs_to_jiffies(2000));
+		vote(chg->awake_votable, CHG_AWAKE_VOTER, false, 0);
 	}
 
 	power_supply_changed(chg->usb_psy);
@@ -8200,14 +8202,12 @@ void smblib_usb_plugin_locked(struct smb_charger *chg)
 		if (rc < 0)
 			smblib_err(chg, "Couldn't start SW thermal regulation WA, rc=%d\n",
 				rc);
-
 		/* Enable SW conn therm Regulation */
-		if (chg->support_conn_therm){
+		 if (chg->support_conn_therm){
 			rc = smblib_set_sw_conn_therm_regulation(chg, true);
 			if (rc < 0)
 				smblib_err(chg, "Couldn't start SW conn therm rc=%d\n", rc);
-		}
-
+		 }
 		/* Remove FCC_STEPPER 1.5A init vote to allow FCC ramp up */
 		if (chg->fcc_stepper_enable)
 			vote(chg->fcc_votable, FCC_STEPPER_VOTER, false, 0);
@@ -8317,8 +8317,7 @@ void smblib_usb_plugin_locked(struct smb_charger *chg)
 		chg->recheck_charger = false;
 		chg->precheck_charger_type = POWER_SUPPLY_TYPE_UNKNOWN;
 		/* clear chg_awake wakeup source when charger is absent */
-		vote(chg->awake_votable, CHG_AWAKE_VOTER, true, 0);
-		schedule_delayed_work(&chg->plugout_delay_awake, msecs_to_jiffies(2000));
+		vote(chg->awake_votable, CHG_AWAKE_VOTER, false, 0);
 	}
 
 	if (chg->connector_type == POWER_SUPPLY_CONNECTOR_MICRO_USB)
@@ -8797,7 +8796,7 @@ static void smblib_handle_hvdcp_check_timeout(struct smb_charger *chg,
 						HVDCP2_CURRENT_UA);
 				else
 					vote(chg->usb_icl_votable, SW_ICL_MAX_VOTER, true,
-							hvdcp_ua);
+						HVDCP_CURRENT_UA);
 			}
 		} else {
 			/* A plain DCP, enforce DCP ICL if specified */
@@ -9179,7 +9178,7 @@ static void typec_src_insertion(struct smb_charger *chg)
 	}
 
 	chg->typec_legacy = stat & TYPEC_LEGACY_CABLE_STATUS_BIT;
-	/* reset typec_legacy to detect PD when power_good_en online */
+	/*reset typec_legacy to detect PD when power_good_en online*/
 	if (chg->power_good_en)
 		chg->typec_legacy = false;
 	chg->ok_to_pd = (!(chg->typec_legacy || chg->pd_disabled)
@@ -9196,12 +9195,6 @@ static void typec_src_insertion(struct smb_charger *chg)
 			smblib_err(chg, "Couldn't to enable DPDM rc=%d\n", rc);
 		else
 			smblib_rerun_apsd(chg);
-	}
-
-	if (chg->support_conn_therm) {
-		rc = smblib_set_sw_conn_therm_regulation(chg, true);
-		if (rc < 0)
-			smblib_err(chg, "Couldn't start SW conn therm rc=%d\n", rc);
 	}
 }
 
@@ -9465,9 +9458,8 @@ static void typec_src_removal(struct smb_charger *chg)
 	vote(chg->usb_icl_votable, MAIN_CHG_SUSPEND_VOTER, false, 0);
 	vote(chg->usb_icl_votable, WIRELESS_BY_USB_IN_VOTER, false, 0);
 	vote(chg->chg_disable_votable, AFTER_FFC_VOTER, false, 0);
-
 	/* clear chg_awake wakeup source when typec removal */
-	schedule_delayed_work(&chg->plugout_delay_awake, msecs_to_jiffies(2000));
+	vote(chg->awake_votable, CHG_AWAKE_VOTER, false, 0);
 	/* reset USBOV votes and cancel work */
 	cancel_delayed_work_sync(&chg->usbov_dbc_work);
 	vote(chg->awake_votable, USBOV_DBC_VOTER, false, 0);
@@ -9735,6 +9727,8 @@ irqreturn_t typec_attach_detach_irq_handler(int irq, void *data)
 	u8 stat;
 	bool attached = false;
 	int rc;
+
+	smblib_dbg(chg, PR_OEM, "IRQ: %s\n", irq_data->name);
 
 	/* IRQ not expected to be executed for uUSB, return */
 	if (chg->connector_type == POWER_SUPPLY_CONNECTOR_MICRO_USB)
@@ -10903,7 +10897,7 @@ int smblib_set_prop_pr_swap_in_progress(struct smb_charger *chg,
 		smblib_err(chg, "Couldn't set tCC debounce rc=%d\n", rc);
 
 	/* if wireless power on, do not set the bit. wireless will set later */
-	if (!dc_power_on)
+	if(!dc_power_on)
 		rc = smblib_masked_write(chg, TYPE_C_EXIT_STATE_CFG_REG,
 				BYPASS_VSAFE0V_DURING_ROLE_SWAP_BIT,
 				val->intval ? BYPASS_VSAFE0V_DURING_ROLE_SWAP_BIT : 0);
@@ -11496,7 +11490,6 @@ static void smblib_chg_termination_work(struct work_struct *work)
 		if (rc < 0)
 			goto out;
 	}
-
 	/*
 	 * In BSM a sudden jump in CC_SOC is not expected. If seen, its a
 	 * good_ocv or updated capacity, reject it.
@@ -12099,7 +12092,6 @@ int smblib_init(struct smb_charger *chg)
 	INIT_DELAYED_WORK(&chg->cc_un_compliant_charge_work, smblib_cc_un_compliant_charge_work);
 	INIT_DELAYED_WORK(&chg->clean_cp_to_sw_work, smblib_clean_cp_to_sw_work);
 	INIT_DELAYED_WORK(&chg->check_init_boot, smb_check_init_boot);
-	INIT_DELAYED_WORK(&chg->plugout_delay_awake, smb_plugout_delay_awake);
 
 	if (chg->wa_flags & CHG_TERMINATION_WA) {
 		INIT_WORK(&chg->chg_termination_work,

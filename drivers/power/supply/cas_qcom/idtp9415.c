@@ -13,6 +13,7 @@
 #include <linux/workqueue.h>
 #include <linux/sysfs.h>
 #include <asm/unaligned.h>
+#include <idtp9415.h>
 #include <linux/regmap.h>
 #include <linux/spinlock.h>
 #include <linux/of_gpio.h>
@@ -25,16 +26,9 @@
 #include <linux/power/ln8282.h>
 #include <soc/qcom/socinfo.h>
 
-#include "idtp9415.h"
-
 static struct idtp9220_device_info *g_di;
-#ifdef CONFIG_FACTORY_BUILD
-#define REVERSE_TEST_READY_CHECK_DELAY_MS 12000
-#define REVERSE_DPING_CHECK_DELAY_MS 15000
-#else
 #define REVERSE_TEST_READY_CHECK_DELAY_MS 8000
 #define REVERSE_DPING_CHECK_DELAY_MS 10000
-#endif
 #define REVERSE_CHG_CHECK_DELAY_MS 100000
 #define BPP_QC_7W_CURRENT 700000
 #define BPP_DEFAULT_CURRENT 800000
@@ -3030,7 +3024,6 @@ static int idtp9220_get_charging_current(struct idtp9220_device_info *di)
 	case ADAPTER_VOICE_BOX:
 		return ICL_CP_2SBATT_30W_MA;
 	case ADAPTER_XIAOMI_PD_45W:
-	case ADAPTER_XIAOMI_PD_60W:
 		return ICL_CP_2SBATT_40W_MA;
 	default:
 		break;
@@ -3048,7 +3041,6 @@ static int idtp9220_get_taper_charging_current(struct idtp9220_device_info *di)
 	case ADAPTER_VOICE_BOX:
 		return ICL_TAPER_2SBATT_30W_MA;
 	case ADAPTER_XIAOMI_PD_45W:
-	case ADAPTER_XIAOMI_PD_60W:
 		return ICL_TAPER_2SBATT_40W_MA;
 	default:
 		break;
@@ -3127,7 +3119,6 @@ static void idtp9220_set_charging_param(struct idtp9220_device_info *di)
 	case ADAPTER_XIAOMI_PD_40W:
 	case ADAPTER_VOICE_BOX:
 	case ADAPTER_XIAOMI_PD_45W:
-	case ADAPTER_XIAOMI_PD_60W:
 		if (di->epp) {
 			adapter_vol = ADAPTER_EPP_MI_VOL;
 			icl_curr = idtp9220_get_charging_current(di);
@@ -3477,7 +3468,6 @@ static void idtp9220_fw_download_work(struct work_struct *work)
 			dev_info(di->dev, "FW: 0x%x, crc: %d so skip upgrade\n",
 				 fw_app_ver[0], crc_ok);
 		} else {
-#ifndef CONFIG_FACTORY_BUILD
 			idtp9220_set_reverse_gpio(di, true);
 			msleep(100);
 
@@ -3503,10 +3493,6 @@ static void idtp9220_fw_download_work(struct work_struct *work)
 			else
 				dev_info(di->dev, "crc verify success.\n");
 			idtp9220_set_reverse_gpio(di, false);
-#else
-			dev_info(di->dev, "%s: factory build, don't update\n",
-				 __func__);
-#endif
 		}
 		di->fw_update = false;
 		pm_relax(di->dev);
@@ -3577,17 +3563,16 @@ static int idtp_set_effective_icl_val(struct idtp9220_device_info *di, int icl)
 }
 
 
-#ifndef CONFIG_FACTORY_BUILD
 #define NEW_MAX_POWER_CMD		0x28
 #define RENEGOTIATION_CMD		0x80
 static void idtp9220_renegociation(struct idtp9220_device_info *di)
 {
-	if (di->tx_charger_type == ADAPTER_XIAOMI_PD_45W || di->tx_charger_type == ADAPTER_XIAOMI_PD_60W) {
+	if (di->tx_charger_type == ADAPTER_XIAOMI_PD_45W) {
 		di->bus.write(di, REG_MAX_POWER, NEW_MAX_POWER_CMD);
 		di->bus.write(di, REG_RX_RESET, RENEGOTIATION_CMD);
 	}
 }
-#endif
+
 static void idtp9220_start_to_load(struct idtp9220_device_info *di)
 {
 	union power_supply_propval val = { 0, };
@@ -3596,8 +3581,7 @@ static void idtp9220_start_to_load(struct idtp9220_device_info *di)
 	schedule_delayed_work(&di->chg_monitor_work,
 				  msecs_to_jiffies(1000));
 	if (di->tx_charger_type == ADAPTER_XIAOMI_PD_40W ||
-		di->tx_charger_type == ADAPTER_XIAOMI_PD_45W ||
-			di->tx_charger_type == ADAPTER_XIAOMI_PD_60W) {
+		di->tx_charger_type == ADAPTER_XIAOMI_PD_45W) {
 		if (di->wireless_psy) {
 			val.intval = di->tx_charger_type;
 			power_supply_set_property(di->wireless_psy, POWER_SUPPLY_PROP_QUICK_CHARGE_TYPE, &val);
@@ -3635,9 +3619,7 @@ static void idtp9220_irq_work(struct work_struct *work)
 	static int retry;
 	static int retry_id;
 	static int retry_count;
-#ifndef CONFIG_FACTORY_BUILD
 	static int renego_retry_count;
-#endif
 	int tx_vin = 0;
 	int irq_level;
 	u8 clr_buf[4] = { 0xFF, 0xFF, 0xFF, 0xFF };
@@ -3895,9 +3877,8 @@ static void idtp9220_irq_work(struct work_struct *work)
 		retry_count = 0;
 
 	}
-#ifndef CONFIG_FACTORY_BUILD
 	if (int_val & RENEG_SUCCESS) {
-		if (di->tx_charger_type == ADAPTER_XIAOMI_PD_45W || di->tx_charger_type == ADAPTER_XIAOMI_PD_60W) {
+		if (di->tx_charger_type == ADAPTER_XIAOMI_PD_45W) {
 			dev_err(di->dev, "%s: max power renegociation success\n", __func__);
 			idtp9220_start_to_load(di);
 			renego_retry_count = 0;
@@ -3905,7 +3886,7 @@ static void idtp9220_irq_work(struct work_struct *work)
 	}
 
 	if (int_val & RENEG_FAIL) {
-		if (di->tx_charger_type == ADAPTER_XIAOMI_PD_45W || di->tx_charger_type == ADAPTER_XIAOMI_PD_60W) {
+		if (di->tx_charger_type == ADAPTER_XIAOMI_PD_45W) {
 			if (renego_retry_count < 3) {
 				idtp9220_renegociation(di);
 				dev_err(di->dev, "%s: retry renegociation\n", __func__);
@@ -3918,7 +3899,6 @@ static void idtp9220_irq_work(struct work_struct *work)
 			}
 		}
 	}
-#endif
 
 	if (int_val & INT_TX_DATA_RECV) {
 		idtp922x_receivePkt(di, recive_data);
@@ -3991,16 +3971,12 @@ static void idtp9220_irq_work(struct work_struct *work)
 			if (di->tx_charger_type == ADAPTER_XIAOMI_PD_40W && di->is_zm_mobil_tx) {
 				di->is_voice_box_tx = 1;
 			}
-#ifdef CONFIG_FACTORY_BUILD
-			idtp9220_start_to_load(di);
-#else
-			if (di->tx_charger_type == ADAPTER_XIAOMI_PD_45W || di->tx_charger_type == ADAPTER_XIAOMI_PD_60W) {
+			if (di->tx_charger_type == ADAPTER_XIAOMI_PD_45W) {
 				renego_retry_count = 0;
 				idtp9220_renegociation(di);
 			} else {
 				idtp9220_start_to_load(di);
 			}
-#endif
 			break;
 		case BC_READ_Vin:
 			tx_vin = recive_data[1] | (recive_data[2] << 8);
@@ -4563,11 +4539,7 @@ static int idtp9220_probe(struct i2c_client *client,
 	dev_info(di->dev, "[idt] success probe idtp922x driver\n");
 	get_cmdline(di);
 	if (!di->power_off_mode)
-#ifdef CONFIG_FACTORY_BUILD
-		schedule_delayed_work(&di->chg_detect_work, 3 * HZ);
-#else
 		schedule_delayed_work(&di->chg_detect_work, 8 * HZ);
-#endif
 	else {
 		dev_info(di->dev, "off-chg mode, reset chip\n");
 		idtp9220_set_enable_mode(di, false);

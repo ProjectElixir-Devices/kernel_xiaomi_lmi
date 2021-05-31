@@ -19,6 +19,8 @@
 
 #include "power_supply.h"
 
+//#undef dev_dbg
+//#define dev_dbg  dev_err
 /*
  * This is because the name "current" breaks the device attr macro.
  * The "current" word resolves to "(get_current())" so instead of
@@ -46,7 +48,7 @@ static const char * const power_supply_type_text[] = {
 	"USB_PD", "USB_PD_DRP", "BrickID",
 	"USB_HVDCP", "USB_HVDCP_3", "USB_HVDCP_3P5", "Wireless", "USB_FLOAT",
 	"BMS", "Parallel", "Main", "USB_C_UFP", "USB_C_DFP",
-	"Charge_Pump", "Batt_Verify"
+	"Charge_Pump","Batt_Verify"
 };
 
 static const char * const power_supply_usb_type_text[] = {

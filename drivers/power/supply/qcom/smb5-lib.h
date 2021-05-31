@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #ifndef __SMB5_CHARGER_H
@@ -73,6 +74,7 @@ enum print_reason {
 #define JEITA_ARB_VOTER			"JEITA_ARB_VOTER"
 #define MOISTURE_VOTER			"MOISTURE_VOTER"
 #define HVDCP2_ICL_VOTER		"HVDCP2_ICL_VOTER"
+#define HVDCP2_FCC_VOTER		"HVDCP2_FCC_VOTER"
 #define HVDCP2_12V_ICL_VOTER		"HVDCP2_12V_ICL_VOTER"
 #define HVDCP2_FCC_VOTER		"HVDCP2_FCC_VOTER"
 #define AICL_THRESHOLD_VOTER		"AICL_THRESHOLD_VOTER"
@@ -88,7 +90,7 @@ enum print_reason {
 #define MAIN_FCC_VOTER			"MAIN_FCC_VOTER"
 #define DCIN_AICL_VOTER			"DCIN_AICL_VOTER"
 #define WLS_PL_CHARGING_VOTER		"WLS_PL_CHARGING_VOTER"
-#define OTG_VOTER					"OTG_VOTER"
+#define OTG_VOTER                       "OTG_VOTER"
 #define ICL_CHANGE_VOTER		"ICL_CHANGE_VOTER"
 #define OVERHEAT_LIMIT_VOTER		"OVERHEAT_LIMIT_VOTER"
 #define TYPEC_SWAP_VOTER		"TYPEC_SWAP_VOTER"
@@ -678,7 +680,6 @@ struct smb_charger {
 	struct delayed_work	cc_un_compliant_charge_work;
 	struct delayed_work	clean_cp_to_sw_work;
 	struct delayed_work     check_init_boot;
-	struct delayed_work	plugout_delay_awake;
 
 	struct alarm		lpd_recheck_timer;
 	struct alarm		moisture_protection_alarm;
@@ -862,6 +863,7 @@ struct smb_charger {
 	int64_t oob_rpp_msg_cnt;
 	int64_t oob_cep_msg_cnt;
 	int			reverse_chg_state;
+	int			reverse_pen_chg_state;
 	int			reverse_gpio_state;
 
 	/* product related */

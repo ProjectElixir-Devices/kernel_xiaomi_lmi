@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  */
 
 #define pr_fmt(fmt) "QCOM-STEPCHG: %s: " fmt, __func__
@@ -501,8 +502,10 @@ static int get_val(struct range_data *range, int hysteresis, int current_index,
 	 * If the threshold is lesser than the minimum allowed range,
 	 * return -ENODATA.
 	 */
-	if (threshold < range[0].low_threshold)
+	if (threshold < range[0].low_threshold) {
+		pr_err("threshold is low then %d, error!\n", range[0].low_threshold);
 		return -ENODATA;
+	}
 
 	/* First try to find the matching index without hysteresis */
 	for (i = 0; i < MAX_STEP_CHG_ENTRIES; i++) {
@@ -698,11 +701,11 @@ static int handle_step_chg_config(struct step_chg_info *chip)
 		vote(chip->fcc_votable, STEP_CHG_VOTER, true, fcc_ua);
 	}
 
-	pr_debug("%s = %d Step-FCC = %duA taper-fcc: %d\n",
+	pr_info("%s = %d Step-FCC = %duA taper-fcc: %d\n",
 		chip->step_chg_config->param.prop_name, pval.intval,
 		get_client_vote(chip->fcc_votable, STEP_CHG_VOTER),
 		chip->taper_fcc);
-	/* bq27z561 get voltage max and current max */
+	/*bq27z561 get voltage max and current max*/
 	if (chip->use_bq_gauge) {
 		rc = power_supply_get_property(chip->bms_psy,
 				POWER_SUPPLY_PROP_VOLTAGE_MAX, &pval);
@@ -958,6 +961,9 @@ static int handle_jeita(struct step_chg_info *chip)
 	if (!chip->usb_icl_votable)
 		goto set_jeita_fv;
 
+	pr_info("%s = %d FCC = %duA FV = %duV\n",
+		chip->jeita_fcc_config->param.prop_name, temp, fcc_ua, fv_uv);
+	pr_err("battery warm = %d battery cool = %d\n", chip->jeita_warm_th, chip->jeita_cool_th);
 	handle_fast_charge(chip, temp);
 
 	/*
@@ -966,6 +972,8 @@ static int handle_jeita(struct step_chg_info *chip)
 	 */
 	rc = power_supply_get_property(chip->batt_psy,
 				POWER_SUPPLY_PROP_VOLTAGE_MAX, &pval);
+	pr_info("%s = %d max voltage= %duv FV = %duV\n",
+		chip->jeita_fcc_config->param.prop_name, temp, pval.intval, fv_uv);
 	if (rc || (pval.intval == fv_uv)) {
 		vote(chip->usb_icl_votable, JEITA_VOTER, false, 0);
 		goto set_jeita_fv;
