@@ -157,7 +157,6 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
 		if (clipped_freq > cpufreq_cdev->clipped_freq)
 			clipped_freq = cpufreq_cdev->clipped_freq;
 	}
-
 	cpufreq_verify_within_limits(policy, floor_freq, clipped_freq);
 	mutex_unlock(&cooling_list_lock);
 
@@ -455,7 +454,6 @@ static int cpufreq_set_cur_state(struct thermal_cooling_device *cdev,
 		cpufreq_update_policy(cpufreq_cdev->policy->cpu);
 		put_online_cpus();
 	}
-
 	return 0;
 }
 
