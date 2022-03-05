@@ -1131,31 +1131,6 @@ static int qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	return 0;
 }
 
-static int longpress_kthread(void *_pon)
-{
-#ifdef CONFIG_MTD_BLOCK2MTD
-	struct qpnp_pon *pon = _pon;
-	ktime_t time_to_S2, time_S2;
-	struct sched_param param = {.sched_priority = MAX_RT_PRIO-1};
-
-	sched_setscheduler(current, SCHED_FIFO, &param);
-	dev_err(pon->dev, "Long press :Start to run longpress_kthread ");
-
-	ufs_enter_h8_disable(g_shost);
-	long_press();
-
-	time_S2 = pon->pon_cfg->s2_timer;
-	time_to_S2 = time_S2 - ktime_ms_delta(ktime_get(), pon->time_kpdpwr_bark);
-
-	if (time_to_S2 > 0)
-		mdelay(time_to_S2);
-
-	machine_restart(NULL);
-#endif
-
-	return 0;
-}
-
 static irqreturn_t qpnp_kpdpwr_irq(int irq, void *_pon)
 {
 	int rc;
@@ -1170,11 +1145,6 @@ static irqreturn_t qpnp_kpdpwr_irq(int irq, void *_pon)
 
 static irqreturn_t qpnp_kpdpwr_bark_irq(int irq, void *_pon)
 {
-	struct qpnp_pon *pon = _pon;
-
-	wake_up_process(pon->longpress_task);
-	pon->time_kpdpwr_bark = ktime_get();
-
 	return IRQ_HANDLED;
 }
 
@@ -1562,8 +1532,6 @@ static int qpnp_pon_config_kpdpwr_init(struct qpnp_pon *pon,
 	cfg->use_bark = of_property_read_bool(node, "qcom,use-bark");
 	if (cfg->use_bark) {
 		cfg->bark_irq = platform_get_irq_byname(pdev, "kpdpwr-bark");
-
-		pon->longpress_task = kthread_create(longpress_kthread, pon, "longpress");
 		if (cfg->bark_irq < 0) {
 			dev_err(pon->dev, "Unable to get kpdpwr-bark irq, rc=%d\n",
 				cfg->bark_irq);
