@@ -457,25 +457,25 @@
 		pil_slpi_mem: pil_slpi_region@88c00000 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0x0 0x88c00000 0x0 0x1500000>;
+			reg = <0x0 0x88c00000 0x0 0x2f00000>;
 		};
 
-		pil_adsp_mem: pil_adsp_region@8a100000 {
+		pil_adsp_mem: pil_adsp_region@8bb00000 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0x0 0x8a100000 0x0 0x2500000>;
+			reg = <0x0 0x8bb00000 0x0 0x2500000>;
 		};
 
-		pil_spss_mem: pil_spss_region@8c600000 {
+		pil_spss_mem: pil_spss_region@8e000000 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0x0 0x8c600000 0x0 0x100000>;
+			reg = <0x0 0x8e000000 0x0 0x100000>;
 		};
 
-		cdsp_secure_heap: cdsp_secure_heap@8c700000 {
+		cdsp_secure_heap: cdsp_secure_heap@8e100000 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0x0 0x8c700000 0x0 0x4600000>;
+			reg = <0x0 0x8e100000 0x0 0x4600000>;
 		};
 
 		adsp_mem: adsp_region {
