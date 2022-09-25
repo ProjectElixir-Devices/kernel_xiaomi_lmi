@@ -529,6 +529,7 @@ static int cnss_get_bdf_file_name(struct cnss_plat_data *plat_priv,
 	hw_platform_ver = get_hw_version_platform();
 	hw_country_ver = get_hw_country_version();
 
+        cnss_pr_dbg("hw_platform_ver is %d\n", hw_platform_ver);
 	switch (bdf_type) {
 	case CNSS_BDF_ELF:
 		if (plat_priv->board_info.board_id == 0xFF) {
@@ -569,12 +570,14 @@ static int cnss_get_bdf_file_name(struct cnss_plat_data *plat_priv,
 				else {
 					if ((get_hw_version_minor() == (uint32_t)HW_MINOR_VERSION_B) && (get_hw_version_major() == (uint32_t)HW_MAJOR_VERSION_B))
 						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_B_BOM);
-					else if (plat_priv->chip_info.chip_id & CHIP_ID_GF_MASK)
-						 snprintf(filename_tmp, filename_len,
-						          ELF_BDF_FILE_NAME_GF);
-                                        else
-						 snprintf(filename_tmp, filename_len,
-						          ELF_BDF_FILE_NAME);
+					else {
+						if (plat_priv->chip_info.chip_id & CHIP_ID_GF_MASK)
+						    snprintf(filename_tmp, filename_len,
+						             ELF_BDF_FILE_NAME_GF);
+                                        	else
+						    snprintf(filename_tmp, filename_len,
+						             ELF_BDF_FILE_NAME);
+					     }
 				}
 			}
 		}
