@@ -26,9 +26,9 @@
 #define ELF_BDF_FILE_NAME_J11_B_BOM		"bd_j11_b.elf"
 #define ELF_BDF_FILE_NAME_J11_INDIA		"bd_j11in.elf"
 #define ELF_BDF_FILE_NAME_J11_GLOBAL		"bd_j11gl.elf"
-#define ELF_BDF_FILE_NAME_GLOBAL	 "bd_j1gl.elf"
-#define ELF_BDF_FILE_NAME_INDIA		 "bd_j1in.elf"
-#define ELF_BDF_FILE_NAME_B_BOM		 "bd_j1_b.elf"
+#define ELF_BDF_FILE_NAME_J1_GLOBAL	 "bd_j1gl.elf"
+#define ELF_BDF_FILE_NAME_J1_INDIA	 "bd_j1in.elf"
+#define ELF_BDF_FILE_NAME_J1_B_BOM	 "bd_j1_b.elf"
 #define ELF_BDF_FILE_NAME_J1S		 "bd_j1s.elf"
 #define ELF_BDF_FILE_NAME_J2S		 "bd_j2s.elf"
 #define ELF_BDF_FILE_NAME_J3S		 "bd_j3s.elf"
@@ -533,63 +533,65 @@ static int cnss_get_bdf_file_name(struct cnss_plat_data *plat_priv,
 	switch (bdf_type) {
 	case CNSS_BDF_ELF:
 		if (plat_priv->board_info.board_id == 0xFF) {
-			if (hw_platform_ver == HARDWARE_PLATFORM_LMI) {
-				if (get_hw_country_version() == (uint32_t)CountryGlobal)
-				    snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J11_GLOBAL);
-				else if (get_hw_country_version() == (uint32_t)CountryIndia)
-				    snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J11_INDIA);
-				else {
-					if ((get_hw_version_minor() == (uint32_t)HW_MINOR_VERSION_B) && (get_hw_version_major() == (uint32_t)HW_MAJOR_VERSION_B))
-						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J11_B_BOM);
-					else
-						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J11);
-				}
-			} else if (hw_platform_ver == HARDWARE_PLATFORM_CAS) {
-				snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J1S);
-			} else if (hw_platform_ver == HARDWARE_PLATFORM_THYME) {
-				snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J2S);
-			} else if (hw_platform_ver == HARDWARE_PLATFORM_APOLLO) {
-				if (get_hw_country_version() == (uint32_t)CountryGlobal)
-				    snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J3S_GLOBAL);
-				else if (get_hw_country_version() == (uint32_t)CountryIndia)
-				    snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J3S_INDIA);
-				else
-				    snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J3S);
-			} else if (hw_platform_ver == HARDWARE_PLATFORM_ALIOTH) {
-				if (get_hw_country_version() == (uint32_t)CountryGlobal)
-				    snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_K11A_GLOBAL);
-				else if (get_hw_country_version() == (uint32_t)CountryIndia)
-				    snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_K11A_INDIA);
-				else
-				    snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_K11A);
+			if (plat_priv->chip_info.chip_id & CHIP_ID_GF_MASK) {
+				snprintf(filename_tmp, filename_len,
+					 ELF_BDF_FILE_NAME_GF);
 			} else {
-				if (hw_country_ver == (uint32_t)CountryGlobal)
-					snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_GLOBAL);
-				else if (hw_country_ver == (uint32_t)CountryIndia)
-					snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_INDIA);
-				else {
-					if ((get_hw_version_minor() == (uint32_t)HW_MINOR_VERSION_B) && (get_hw_version_major() == (uint32_t)HW_MAJOR_VERSION_B))
-						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_B_BOM);
-					else {
-						if (plat_priv->chip_info.chip_id & CHIP_ID_GF_MASK)
-						    snprintf(filename_tmp, filename_len,
-						             ELF_BDF_FILE_NAME_GF);
+				switch (hw_platform_ver) {
+				case HARDWARE_PLATFORM_LMI:
+					if (hw_country_ver == (uint32_t)CountryGlobal) {
+						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J11_GLOBAL);
+					} else if (hw_country_ver == (uint32_t)CountryIndia) {
+						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J11_INDIA);
+					} else {
+						if ((get_hw_version_minor() == (uint32_t)HW_MINOR_VERSION_B) &&
+						    (get_hw_version_major() == (uint32_t)HW_MAJOR_VERSION_B))
+							snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J11_B_BOM);
+						else
+							snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J11);
+					}
+					break;
+				case HARDWARE_PLATFORM_CAS:
+					snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J1S);
+					break;
+				case HARDWARE_PLATFORM_THYME:
+					snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J2S);
+					break;
+				case HARDWARE_PLATFORM_APOLLO:
+					if (hw_country_ver == (uint32_t)CountryGlobal)
+						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J3S_GLOBAL);
+					else if (hw_country_ver == (uint32_t)CountryIndia)
+						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J3S_INDIA);
+					else
+						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J3S);
+					break;
+				case HARDWARE_PLATFORM_ALIOTH:
+					if (hw_country_ver == (uint32_t)CountryGlobal)
+						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_K11A_GLOBAL);
+					else if (hw_country_ver == (uint32_t)CountryIndia)
+						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_K11A_INDIA);
+					else
+						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_K11A);
+					break;
+				case HARDWARE_PLATFORM_CMI:
+					if (hw_country_ver == (uint32_t)CountryGlobal) {
+						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J1_GLOBAL);
+					} else if (hw_country_ver == (uint32_t)CountryIndia) {
+						snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J1_INDIA);
+					} else {
+						if ((get_hw_version_minor() == (uint32_t)HW_MINOR_VERSION_B) &&
+						    (get_hw_version_major() == (uint32_t)HW_MAJOR_VERSION_B))
+							snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME_J1_B_BOM);
                                         	else
-						    snprintf(filename_tmp, filename_len,
-						             ELF_BDF_FILE_NAME);
-					     }
+						        snprintf(filename_tmp, filename_len, ELF_BDF_FILE_NAME);
+					}
+					break;
 				}
 			}
-		}
-		else if (plat_priv->board_info.board_id < 0xFF) {
-			if (plat_priv->chip_info.chip_id & CHIP_ID_GF_MASK)
-				snprintf(filename_tmp, filename_len,
-					 ELF_BDF_FILE_NAME_GF_PREFIX "%02x",
-					 plat_priv->board_info.board_id);
-			else
-				snprintf(filename_tmp, filename_len,
-					 ELF_BDF_FILE_NAME_PREFIX "%02x",
-					 plat_priv->board_info.board_id);
+		} else if (plat_priv->board_info.board_id < 0xFF) {
+			snprintf(filename_tmp, filename_len,
+				 ELF_BDF_FILE_NAME_PREFIX "%02x",
+				 plat_priv->board_info.board_id);
 		} else {
 			snprintf(filename_tmp, filename_len,
 				 BDF_FILE_NAME_PREFIX "%02x.e%02x",
