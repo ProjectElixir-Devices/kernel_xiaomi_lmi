@@ -3,6 +3,7 @@
  * QTI Secure Execution Environment Communicator (QSEECOM) driver
  *
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "QSEECOM: %s: " fmt, __func__
@@ -91,7 +92,7 @@
 #define TWO 2
 #define QSEECOM_UFS_ICE_CE_NUM 10
 #define QSEECOM_SDCC_ICE_CE_NUM 20
-#define QSEECOM_ICE_FDE_KEY_INDEX 0
+#define QSEECOM_ICE_FDE_KEY_INDEX 31
 
 #define PHY_ADDR_4G	(1ULL<<32)
 
@@ -704,7 +705,7 @@ static int qseecom_scm_call2(uint32_t svc_id, uint32_t tz_cmd_id,
 			qseecom.smcinvoke_support = true;
 			smc_id = TZ_OS_REGISTER_LISTENER_SMCINVOKE_ID;
 			ret = __qseecom_scm_call2_locked(smc_id, &desc);
-			if (ret == -EIO) {
+			if (ret == -EOPNOTSUPP) {
 				/* smcinvoke is not supported */
 				qseecom.smcinvoke_support = false;
 				smc_id = TZ_OS_REGISTER_LISTENER_ID;
@@ -1933,7 +1934,7 @@ static int qseecom_scale_bus_bandwidth(struct qseecom_dev_handle *data,
 		pr_err("copy_from_user failed\n");
 		return ret;
 	}
-	if (req_mode > HIGH) {
+	if (req_mode > HIGH || req_mode < QSEECOM_STATE_NOT_READY) {
 		pr_err("Invalid bandwidth mode (%d)\n", req_mode);
 		return -EINVAL;
 	}
@@ -2623,12 +2624,6 @@ err_resp:
 		case QSEOS_RESULT_CBACK_REQUEST:
 			pr_warn("get cback req app_id = %d, resp->data = %d\n",
 				data->client.app_id, resp->data);
-			resp->resp_type = SMCINVOKE_RESULT_INBOUND_REQ_NEEDED;
-			/* We are here because scm call sent to TZ has requested
-			 * for another callback request. This call has been a
-			 * success and hence setting result = 0
-			 */
-			resp->result = 0;
 			break;
 		default:
 			pr_err("fail:resp res= %d,app_id = %d,lstr = %d\n",
@@ -3710,8 +3705,8 @@ static int __qseecom_send_cmd(struct qseecom_dev_handle *data,
 				(uint32_t)(__qseecom_uvirt_to_kphys(
 				data, (uintptr_t)req->resp_buf));
 		} else {
-			send_data_req.req_ptr = (uint32_t)req->cmd_req_buf;
-			send_data_req.rsp_ptr = (uint32_t)req->resp_buf;
+			send_data_req.req_ptr = (uintptr_t)req->cmd_req_buf;
+			send_data_req.rsp_ptr = (uintptr_t)req->resp_buf;
 		}
 
 		send_data_req.req_len = req->cmd_req_len;
@@ -4360,6 +4355,11 @@ static int __qseecom_send_modfd_cmd(struct qseecom_dev_handle *data,
 	/* Allocate kernel buffer for request and response*/
 	ret = __qseecom_alloc_coherent_buf(req.cmd_req_len + req.resp_len,
 					&va, &pa);
+	if (ret) {
+		pr_err("Failed to allocate coherent buf, ret %d\n", ret);
+		return ret;
+	}
+
 	req.cmd_req_buf = va;
 	send_cmd_req.cmd_req_buf = (void *)pa;
 
@@ -5367,8 +5367,8 @@ int qseecom_process_listener_from_smcinvoke(struct scm_desc *desc)
 		pr_err("Failed on cmd %d for lsnr %d session %d, ret = %d\n",
 			(int)desc->ret[0], (int)desc->ret[2],
 			(int)desc->ret[1], ret);
-	desc->ret[0] = resp.resp_type;
-	desc->ret[1] = resp.result;
+	desc->ret[0] = resp.result;
+	desc->ret[1] = resp.resp_type;
 	desc->ret[2] = resp.data;
 	return ret;
 }
@@ -9696,7 +9696,8 @@ static int qseecom_suspend(struct platform_device *pdev, pm_message_t state)
 
 	mutex_unlock(&clk_access_lock);
 	mutex_unlock(&qsee_bw_mutex);
-	cancel_work_sync(&qseecom.bw_inactive_req_ws);
+	if (qseecom.support_bus_scaling)
+		cancel_work_sync(&qseecom.bw_inactive_req_ws);
 
 	return 0;
 }
