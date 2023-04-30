@@ -945,8 +945,6 @@ static int ovs_flow_cmd_new(struct sk_buff *skb, struct genl_info *info)
 
 	ovs_flow_mask_key(&new_flow->key, key, true, &mask);
 
-	ovs_flow_mask_key(&new_flow->key, key, true, &mask);
-
 	/* Extract flow identifier. */
 	error = ovs_nla_get_identifier(&new_flow->id, a[OVS_FLOW_ATTR_UFID],
 				       key, log);
