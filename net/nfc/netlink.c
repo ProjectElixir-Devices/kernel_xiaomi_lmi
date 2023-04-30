@@ -1467,12 +1467,6 @@ error:
 	device_unlock(&dev->dev);
 	kfree(cb_context);
 	return rc;
-
-error:
-	kfree(cb_context);
-	device_unlock(&dev->dev);
-	kfree(cb_context);
-	return rc;
 }
 
 struct se_io_ctx {
