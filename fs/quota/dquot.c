@@ -248,14 +248,6 @@ static void put_quota_format(struct quota_format_type *fmt)
  * dirtied, and this list is searched when writing dirty dquots back to
  * quota file. Note that some filesystems do dirty dquot tracking on their
  * own (e.g. in a journal) and thus don't use dqi_dirty_list.
-<<<<<<< HEAD
- *
- * Dirty dquots are added to the dqi_dirty_list of quota_info when mark
- * dirtied, and this list is searched when writing dirty dquots back to
- * quota file. Note that some filesystems do dirty dquot tracking on their
- * own (e.g. in a journal) and thus don't use dqi_dirty_list.
-=======
->>>>>>> 4.19.298
  *
  * Dquots with a specific identity (device, type and id) are placed on
  * one of the dquot_hash[] hash chains. The provides an efficient search
